@@ -23,7 +23,6 @@ if( SuperLU_FOUND )
   add_definitions( -DLINEAR_SOLVER_USES_SUPERLU )
 endif( SuperLU_FOUND )
 
-
 find_package( SuiteSparse REQUIRED )
 if( SuiteSparse_FOUND )
   include_directories( ${SuiteSparse_INCLUDE_DIRS} )

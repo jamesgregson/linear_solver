@@ -47,7 +47,8 @@ namespace linear_solver {
         
         /** ILDLT preconditioner type */
         typedef gmm::ildltt_precond< typename sparse_matrix<real>::matrix_type >            ildlt_precond;
-        
+      
+#if defined(LINEAR_SOLVER_USES_EIGEN)
         /** LU factors type for built-in Eigen SparseLU solver */
         typedef Eigen::SparseLU< Eigen::SparseMatrix<real>, Eigen::COLAMDOrdering<int> >    lu_factors;
         
@@ -56,7 +57,8 @@ namespace linear_solver {
         
         /** QR factors type for built-in Eigen SparseQR solver */
         typedef Eigen::SparseQR< Eigen::SparseMatrix<real>, Eigen::COLAMDOrdering<int> >    qr_factors;
-
+#endif
+        
 #if defined(LINEAR_SOLVER_USES_EIGEN) && defined(LINEAR_SOLVER_USES_SUPERLU)
         /** SuperLU factorization type, requires the SuperLU library */
         typedef Eigen::SuperLU< Eigen::SparseMatrix<real> >                                 superlu_factors;
@@ -99,9 +101,11 @@ namespace linear_solver {
     public:
         /** @brief constructor initialize all instance variables to NULL */
         solver_cache_data(){
+#if defined(LINEAR_SOLVER_USES_EIGEN)
             IDENT=NULL; ILUT=NULL;
             ILDLT=NULL; LU=NULL;
             CHOL=NULL; QR=NULL;
+#endif
 #if defined(LINEAR_SOLVER_USES_EIGEN) && defined(LINEAR_SOLVER_USES_SUPERLU)
             SUPERLU=NULL;
 #endif
@@ -120,11 +124,14 @@ namespace linear_solver {
             if( IDENT )   delete IDENT;
             if( ILUT  )   delete ILUT;
             if( ILDLT )   delete ILDLT;
+            IDENT=NULL; ILUT=NULL; ILDLT=NULL;
+
+#if defined(LINEAR_SOLVER_USES_EIGEN)
             if( LU    )   delete LU;
             if( CHOL  )   delete CHOL;
             if( QR    )   delete QR;
-            IDENT=NULL; ILUT=NULL; ILDLT=NULL;
             LU=NULL; CHOL=NULL; QR=NULL;
+#endif
             
 #if defined(LINEAR_SOLVER_USES_EIGEN) && defined(LINEAR_SOLVER_USES_SUPERLU)
             if( SUPERLU ) delete SUPERLU;
@@ -156,7 +163,7 @@ namespace linear_solver {
                 ILDLT = new ildlt_precond( M.mat(), nnz, drop );
             return ILDLT;
         }
-        
+#if defined(LINEAR_SOLVER_USES_EIGEN)
         /** @brief returns a lu_factors instance, creating one if it does not exist */
         lu_factors *get_lu_factors( const sparse_matrix<real> &M ){
             if( !LU )
@@ -177,8 +184,9 @@ namespace linear_solver {
                 QR = new qr_factors( M.to_eigen() );
             return QR;
         }
+#endif
 
-#if defined(LINEAR_SOLVER_USES_EIGEN) && defined(LINEAR_SOLVER_USES_CHOLMOD)
+#if defined(LINEAR_SOLVER_USES_EIGEN) && defined(LINEAR_SOLVER_USES_SUPERLU)
         /** @brief returns a superlu_factors instance, creating one if it does not exist */
         superlu_factors *get_superlu_factors( const sparse_matrix<real> &M ){
             if( !SUPERLU )
