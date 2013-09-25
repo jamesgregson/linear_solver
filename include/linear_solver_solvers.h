@@ -42,6 +42,9 @@ namespace linear_solver {
         /** Identity preconditioner type, doesn't need to be cached but keeps the code cleaner */
         typedef gmm::identity_matrix                                                        identity_precond;
         
+        /** Diagonal preconditioner type */
+        typedef gmm::diagonal_precond< typename sparse_matrix<real>::matrix_type >          diag_precond;
+        
         /** ILU preconditioner type */
         typedef gmm::ilu_precond< typename sparse_matrix<real>::matrix_type >               ilu_precond;
         
@@ -77,6 +80,9 @@ namespace linear_solver {
     private:
         /** Identity preconditioner instance, doesn't need to be cached but keeps the code cleaner */
         identity_precond      *IDENT=NULL;
+        
+        /** Diagonal preconditioner instance */
+        diag_precond         *DIAG=NULL;
         
         /** ILU preconditioner instance */
         ilu_precond          *ILU=NULL;
@@ -114,7 +120,7 @@ namespace linear_solver {
         /** @brief constructor initialize all instance variables to NULL */
         solver_cache_data(){
             IDENT=NULL; ILUT=NULL; ILU=NULL;
-            ILDLT=NULL; ILDLTT=NULL;
+            ILDLT=NULL; ILDLTT=NULL; DIAG=NULL;
 #if defined(LINEAR_SOLVER_USES_EIGEN)
             LU=NULL; CHOL=NULL; QR=NULL;
 #endif
@@ -134,11 +140,13 @@ namespace linear_solver {
         /** @brief free allocated memory for any non-null instance, reset instance variable to NULL */
         void free_cache(){
             if( IDENT )   delete IDENT;
+            if( DIAG )    delete DIAG;
+            if( ILU )     delete ILU;
             if( ILUT  )   delete ILUT;
             if( ILDLT )   delete ILDLT;
             if( ILDLTT )  delete ILDLTT;
             if( ILU   )   delete ILU;
-            IDENT=NULL; ILUT=NULL; ILDLT=NULL; ILDLTT=NULL;
+            IDENT=NULL; DIAG=NULL; ILU=NULL; ILUT=NULL; ILDLT=NULL; ILDLTT=NULL;
 
 #if defined(LINEAR_SOLVER_USES_EIGEN)
             if( LU    )   delete LU;
@@ -164,6 +172,14 @@ namespace linear_solver {
             return IDENT;
         }
         
+        /** @brief returns a diag_preconditioner instance, creating one if it does not exist */
+        diag_precond *get_diag_preconditioner( const sparse_matrix<real> &M ){
+            if( !DIAG )
+                DIAG = new diag_precond(M.mat());
+            return DIAG;
+        }
+        
+        /** @brief returns an ilu_preconditioner instance, creating one if it doesn't exist */
         ilu_precond *get_ilu_preconditioner( const sparse_matrix<real> &M ){
             if( !ILU )
                 ILU = new ilu_precond(M.mat());
@@ -184,6 +200,7 @@ namespace linear_solver {
             return ILDLT;
         }
         
+        /** @brief returns and ildltt_preconditioner instance, creating one if it doesn't exist */
         ildltt_precond *get_ildltt_preconditioner( const sparse_matrix<real> &M, const int nnz, const real drop ){
             if( !ILDLTT )
                 ILDLTT = new ildltt_precond( M.mat(), nnz, drop );
@@ -252,8 +269,11 @@ namespace linear_solver {
             -# "CHOLMOD": Use Cholmod Simplicial Cholesky (as exposed by Eigen3), symmetric square matrices
         - opts["PRECOND"]
             -# "NONE": No preconditioning, valid for solvers "BICGSTAB","CG" & "GMRES"
+            -# "DIAG": Diagonal preconditioning, valid for "BICGSTAB", "CG" & "GMRES"
+            -# "ILU":  Incomplete LU, for "BICGSTAB" and "GMRES"
             -# "ILUT": Use thresholded, fill-limited incomplete LU, preferred for "BICGSTAB", "GMRES"
-            -# "ILDLT": Used thresholded, fill-limited incomplete Cholesky, valid for "CG"
+            -# "ILDLT": Incomplete Cholesky, valid for "CG"
+            -# "ILDLTT": Used thresholded, fill-limited incomplete Cholesky, valid for "CG"
         - opts["PRECOND_FILL"] String containing integer listing maximum number of non-zeros per row for "ILUT" and "ILDLT" preconditioners, default 20
         - opts["PRECOND_DROP"] String containing real value listing drop-tolerance for row entries of "ILUT" and "ILDLT" preconditioners, detault 1e-4
         - opts["CONV_TOL"] String containing real value listing iterative solver convergence tolerance, default 1e-8
@@ -296,6 +316,12 @@ namespace linear_solver {
                 if( opts["VERBOSE"] == "TRUE" )
                     iter.set_noisy(1);
                 gmm::bicgstab( A.mat(), x.vec(), b.vec(), *cache->get_identity_preconditioner(A), iter );
+            } else if( opts["PRECOND"] == "DIAG" ){
+                gmm::iteration iter( conv_tol );
+                iter.set_maxiter( max_iters );
+                if( opts["VERBOSE"] == "TRUE" )
+                    iter.set_noisy(1);
+                gmm::bicgstab( A.mat(), x.vec(), b.vec(), *cache->get_diag_preconditioner(A), iter );
             } else if( opts["PRECOND"] == "ILU" ){
                 gmm::iteration iter( conv_tol );
                 iter.set_maxiter( max_iters );
@@ -324,6 +350,12 @@ namespace linear_solver {
                 if( opts["VERBOSE"] == "TRUE" )
                     iter.set_noisy(1);
                 gmm::cg( A.mat(), x.vec(), b.vec(), *cache->get_identity_preconditioner(A), iter );
+            } else if( opts["PRECOND"] == "DIAG" ){
+                gmm::iteration iter( conv_tol );
+                iter.set_maxiter( max_iters );
+                if( opts["VERBOSE"] == "TRUE" )
+                    iter.set_noisy(1);
+                gmm::cg( A.mat(), x.vec(), b.vec(), *cache->get_diag_preconditioner(A), iter );
             } else if( opts["PRECOND"] == "ILDLT" ){
                 gmm::iteration iter( conv_tol );
                 iter.set_maxiter( max_iters );
@@ -353,7 +385,13 @@ namespace linear_solver {
                 if( opts["VERBOSE"] == "TRUE" )
                     iter.set_noisy(1);
                 gmm::gmres( A.mat(), x.vec(), b.vec(), *cache->get_identity_preconditioner(A), gmres_restart, iter );
-            } else if( opts["PRECOND"] == "ILU" ){
+            } else if( opts["PRECOND"] == "DIAG" ){
+                gmm::iteration iter( conv_tol );
+                iter.set_maxiter( max_iters );
+                if( opts["VERBOSE"] == "TRUE" )
+                    iter.set_noisy(1);
+                gmm::gmres( A.mat(), x.vec(), b.vec(), *cache->get_diag_preconditioner(A), gmres_restart, iter );
+            }else if( opts["PRECOND"] == "ILU" ){
                 gmm::iteration iter( conv_tol );
                 iter.set_maxiter( max_iters );
                 if( opts["VERBOSE"] == "TRUE" )
