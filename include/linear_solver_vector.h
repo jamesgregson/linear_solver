@@ -115,11 +115,19 @@ namespace linear_solver {
             return res;
         }
         
+        inline void operator+=( const vector<real> &in ){
+            *this = *this + in;
+        }
+        
         /** @brief returns the difference between this vector and the input vector */
         inline vector<real> operator-( const vector<real> &in ) const {
             vector<real> res( size() );
             gmm::add( m_V, gmm::scaled(in.m_V,-1.0), res.m_V );
             return res;
+        }
+        
+        inline void operator-=( const vector<real> &in ){
+            *this = *this - in;
         }
         
         /** @brief returns this vector scaled by the input scalar */
@@ -130,12 +138,22 @@ namespace linear_solver {
             return res;
         }
         
+        template< typename scalar > 
+        inline void operator*=( const scalar &in ){
+            *this = *this * in;
+        }
+        
         /** @brief returns this vector scaled by the inverse of the input scalar */
         template< typename scalar >
         inline vector<real> operator/( const scalar in ) const {
             vector<real> res( size() );
             gmm::copy( gmm::scaled( m_V, 1.0/in ), res.m_V );
             return res;
+        }
+        
+        template< typename scalar >
+        inline void operator/=( const scalar &in ){
+            *this = *this / in;
         }
     };
     

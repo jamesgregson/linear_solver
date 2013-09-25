@@ -42,11 +42,17 @@ namespace linear_solver {
         /** Identity preconditioner type, doesn't need to be cached but keeps the code cleaner */
         typedef gmm::identity_matrix                                                        identity_precond;
         
+        /** ILU preconditioner type */
+        typedef gmm::ilu_precond< typename sparse_matrix<real>::matrix_type >               ilu_precond;
+        
         /** ILUT preconditioner type */
         typedef gmm::ilut_precond< typename sparse_matrix<real>::matrix_type >              ilut_precond;
         
         /** ILDLT preconditioner type */
-        typedef gmm::ildltt_precond< typename sparse_matrix<real>::matrix_type >            ildlt_precond;
+        typedef gmm::ildlt_precond< typename sparse_matrix<real>::matrix_type >             ildlt_precond;
+        
+        /** ILDLTT preconditioner type */
+        typedef gmm::ildltt_precond< typename sparse_matrix<real>::matrix_type >            ildltt_precond;
       
 #if defined(LINEAR_SOLVER_USES_EIGEN)
         /** LU factors type for built-in Eigen SparseLU solver */
@@ -72,11 +78,17 @@ namespace linear_solver {
         /** Identity preconditioner instance, doesn't need to be cached but keeps the code cleaner */
         identity_precond      *IDENT=NULL;
         
+        /** ILU preconditioner instance */
+        ilu_precond          *ILU=NULL;
+        
         /** ILUT preconditioner instance */
         ilut_precond          *ILUT=NULL;
         
-        /** ILDLT preconditioner type */
+        /** ILDLT preconditioner instance */
         ildlt_precond         *ILDLT=NULL;
+        
+        /** ILDLTT preconditioner instance */
+        ildltt_precond         *ILDLTT=NULL;
 #ifdef LINEAR_SOLVER_USES_EIGEN
     
         /** LU factors instance for built-in Eigen SparseLU solver */
@@ -101,10 +113,10 @@ namespace linear_solver {
     public:
         /** @brief constructor initialize all instance variables to NULL */
         solver_cache_data(){
+            IDENT=NULL; ILUT=NULL; ILU=NULL;
+            ILDLT=NULL; ILDLTT=NULL;
 #if defined(LINEAR_SOLVER_USES_EIGEN)
-            IDENT=NULL; ILUT=NULL;
-            ILDLT=NULL; LU=NULL;
-            CHOL=NULL; QR=NULL;
+            LU=NULL; CHOL=NULL; QR=NULL;
 #endif
 #if defined(LINEAR_SOLVER_USES_EIGEN) && defined(LINEAR_SOLVER_USES_SUPERLU)
             SUPERLU=NULL;
@@ -124,7 +136,9 @@ namespace linear_solver {
             if( IDENT )   delete IDENT;
             if( ILUT  )   delete ILUT;
             if( ILDLT )   delete ILDLT;
-            IDENT=NULL; ILUT=NULL; ILDLT=NULL;
+            if( ILDLTT )  delete ILDLTT;
+            if( ILU   )   delete ILU;
+            IDENT=NULL; ILUT=NULL; ILDLT=NULL; ILDLTT=NULL;
 
 #if defined(LINEAR_SOLVER_USES_EIGEN)
             if( LU    )   delete LU;
@@ -150,6 +164,12 @@ namespace linear_solver {
             return IDENT;
         }
         
+        ilu_precond *get_ilu_preconditioner( const sparse_matrix<real> &M ){
+            if( !ILU )
+                ILU = new ilu_precond(M.mat());
+            return ILU;
+        }
+        
         /** @brief returns an ilut_preconditioner instance, creating one if it does not exist */
         ilut_precond *get_ilut_preconditioner( const sparse_matrix<real> &M, const int nnz, const real drop ){
             if( !ILUT )
@@ -158,10 +178,16 @@ namespace linear_solver {
         }
         
         /** @brief returns an ildlt_preconditioner instance, creating one if it does not exist */
-        ildlt_precond *get_ildlt_preconditioner( const sparse_matrix<real> &M, const int nnz, const real drop ){
+        ildlt_precond *get_ildlt_preconditioner( const sparse_matrix<real> &M ){
             if( !ILDLT )
-                ILDLT = new ildlt_precond( M.mat(), nnz, drop );
+                ILDLT = new ildlt_precond( M.mat() );
             return ILDLT;
+        }
+        
+        ildltt_precond *get_ildltt_preconditioner( const sparse_matrix<real> &M, const int nnz, const real drop ){
+            if( !ILDLTT )
+                ILDLTT = new ildltt_precond( M.mat(), nnz, drop );
+            return ILDLTT;
         }
 #if defined(LINEAR_SOLVER_USES_EIGEN)
         /** @brief returns a lu_factors instance, creating one if it does not exist */
@@ -234,7 +260,7 @@ namespace linear_solver {
         - opts["MAX_ITERS"] String containing integer value listing maximum number of iterative solver iterations
     */
     template< typename real >
-    bool solve_square_system( const sparse_matrix<real> &A, vector<real> &x, const vector<real> &b, solver_options opts=solver_options(), solver_cache_data<real> *cache=NULL ){
+    bool solve_square_system( const sparse_matrix<real> &A, vector<real> &x, const vector<real> &b, solver_options opts=solver_options(), solver_cache_data<real> *cache=NULL, void (*iter_callback)(const std::string &msg )=NULL ){
         if( opts["SOLVER"] == "" ) opts["SOLVER"] = "BICGSTAB";
         
         int precond_fill, max_iters, gmres_restart;
@@ -270,6 +296,12 @@ namespace linear_solver {
                 if( opts["VERBOSE"] == "TRUE" )
                     iter.set_noisy(1);
                 gmm::bicgstab( A.mat(), x.vec(), b.vec(), *cache->get_identity_preconditioner(A), iter );
+            } else if( opts["PRECOND"] == "ILU" ){
+                gmm::iteration iter( conv_tol );
+                iter.set_maxiter( max_iters );
+                if( opts["VERBOSE"] == "TRUE" )
+                    iter.set_noisy(1);
+                gmm::bicgstab( A.mat(), x.vec(), b.vec(), *cache->get_ilu_preconditioner(A), iter );
             } else if( opts["PRECOND"] == "ILUT" ){
                 gmm::iteration iter( conv_tol );
                 iter.set_maxiter( max_iters );
@@ -297,7 +329,13 @@ namespace linear_solver {
                 iter.set_maxiter( max_iters );
                 if( opts["VERBOSE"] == "TRUE" )
                     iter.set_noisy(1);
-                gmm::cg( A.mat(), x.vec(), b.vec(), *cache->get_ildlt_preconditioner(A,precond_fill,precond_drop), iter );
+                gmm::cg( A.mat(), x.vec(), b.vec(), *cache->get_ildlt_preconditioner(A), iter );
+            } else if( opts["PRECOND"] == "ILDLTT" ){
+                gmm::iteration iter( conv_tol );
+                iter.set_maxiter( max_iters );
+                if( opts["VERBOSE"] == "TRUE" )
+                    iter.set_noisy(1);
+                gmm::cg( A.mat(), x.vec(), b.vec(), *cache->get_ildltt_preconditioner(A,precond_fill,precond_drop), iter );
             } else {
                 std::cout << "unknown preconditioner for conjugate gradient: " << opts["PRECOND"] << std::endl;
                 std::cout << "choose from one of: NONE, ILDLT" << std::endl;
@@ -315,6 +353,12 @@ namespace linear_solver {
                 if( opts["VERBOSE"] == "TRUE" )
                     iter.set_noisy(1);
                 gmm::gmres( A.mat(), x.vec(), b.vec(), *cache->get_identity_preconditioner(A), gmres_restart, iter );
+            } else if( opts["PRECOND"] == "ILU" ){
+                gmm::iteration iter( conv_tol );
+                iter.set_maxiter( max_iters );
+                if( opts["VERBOSE"] == "TRUE" )
+                    iter.set_noisy(1);
+                gmm::gmres( A.mat(), x.vec(), b.vec(), *cache->get_ilu_preconditioner(A), gmres_restart, iter );
             } else if( opts["PRECOND"] == "ILUT" ){
                 gmm::iteration iter( conv_tol );
                 iter.set_maxiter( max_iters );
