@@ -145,7 +145,6 @@ namespace linear_solver {
             if( ILUT  )   delete ILUT;
             if( ILDLT )   delete ILDLT;
             if( ILDLTT )  delete ILDLTT;
-            if( ILU   )   delete ILU;
             IDENT=NULL; DIAG=NULL; ILU=NULL; ILUT=NULL; ILDLT=NULL; ILDLTT=NULL;
 
 #if defined(LINEAR_SOLVER_USES_EIGEN)
@@ -276,6 +275,7 @@ namespace linear_solver {
             -# "ILDLTT": Used thresholded, fill-limited incomplete Cholesky, valid for "CG"
         - opts["PRECOND_FILL"] String containing integer listing maximum number of non-zeros per row for "ILUT" and "ILDLT" preconditioners, default 20
         - opts["PRECOND_DROP"] String containing real value listing drop-tolerance for row entries of "ILUT" and "ILDLT" preconditioners, detault 1e-4
+        - opts["GMRES_RESTART"] String containing integer value specifying the GMRES restart parameter 'm', default=20
         - opts["CONV_TOL"] String containing real value listing iterative solver convergence tolerance, default 1e-8
         - opts["MAX_ITERS"] String containing integer value listing maximum number of iterative solver iterations
     */

@@ -81,6 +81,15 @@ namespace linear_solver {
             return m_V.size();
         }
 
+        /** @brief return the length of the vector */
+        inline real length() const {
+            real tmp=0.0;
+            for( int i=0; i<size(); i++ ){
+                tmp += m_V[i]*m_V[i];
+            }
+            return sqrt(tmp);
+        }
+        
         /** @brief returns the 2-norm of the vector */
         inline real norm() const {
             return gmm::vect_norm2( m_V );
