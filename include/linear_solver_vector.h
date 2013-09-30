@@ -31,7 +31,7 @@ namespace linear_solver {
         /**
          @brief Construct a vector of size=size with values=val
         */
-        vector( int size=0, const real val=0.0 ){
+        vector( int size=0, const real val=real(0.0) ){
             m_V = vector_type( size, val );
         }
         
@@ -81,6 +81,13 @@ namespace linear_solver {
             return m_V.size();
         }
 
+        /** @brief fill with a set value */
+        inline void fill( real val ){
+            for( int i=0; i<size(); i++ ){
+                m_V[i] = val;
+            }
+        }
+        
         /** @brief return the length of the vector */
         inline real length() const {
             real tmp=0.0;
