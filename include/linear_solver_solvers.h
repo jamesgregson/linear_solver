@@ -480,6 +480,32 @@ namespace linear_solver {
         return false;
     }
     
+    /**
+     @brief Solves a rectangular, weighted least-squares system, see description of solve_square_system().  If opts["SOLVER"] = "LSCG" or "QR" solves the sytem using GMM++ least_squares_cg solver or Eigen3 SparseQR respectively, otherwise forms the normal equations and passes the resulting system to solve_square system(). Contributed by Nicholas Vining in September 2013.
+     */
+    template< typename real >
+    bool solve_weighted_least_squares_system( const sparse_matrix<real> &A, vector<real> &x, const vector<real> &b, const vector<real> &w, solver_options opts=solver_options(), solver_cache_data<real> *cache=NULL ){
+		
+		sparse_matrix<real> W( A.rows(), A.rows() ),
+        WA(A.rows(), A.cols()),
+        AtWA( A.cols(), A.cols() );
+        
+		vector<real> Wb( b.size() ),
+        AtWb( A.cols() );
+        
+		sparse_matrix<real> At = A.transpose();
+        
+		for( int i=0; i<(int)w.size(); i++ ){
+			W(i,i) = w[i];
+		}
+		WA = W * A;
+		AtWA = At * WA;
+		Wb = W * b;
+		AtWb = At * Wb;
+        
+        return solve_square_system( AtWA, x, AtWb, opts, cache );
+    }
+    
 };
 
 #endif
