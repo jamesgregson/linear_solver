@@ -6,6 +6,8 @@
  @author James Gregson (james.gregson@gmail.com)
  @copyright James Gregson 2013. Licensed under MIT license
  @brief File for linear solver code.  Includes a variety of direct and iterative solvers.  Iterative solvers are taken from the GMM++ library and include preconditioned CG, BiCGSTAB and GMRES.  Available preconditioners are Identity, ILDLTT (incomplete Cholesky with fill limit and thresholding) and ILUT (incomplete LU with fill limit and thresholding. Direct solvers are used from Eigen3 and include SparseLU, SparseCholesky, SparseQR, SuperLU and Cholmod.
+ 
+    - Oct. 13, 2013 - Removed NULL initialization of solver_cache_data members in class definition to fix compile errors under VS2010 as submitted by Darcy Harrison
 */
 
 #include<iostream>
@@ -79,41 +81,41 @@ namespace linear_solver {
 #endif
     private:
         /** Identity preconditioner instance, doesn't need to be cached but keeps the code cleaner */
-        identity_precond      *IDENT=NULL;
+        identity_precond      *IDENT;
         
         /** Diagonal preconditioner instance */
-        diag_precond         *DIAG=NULL;
+        diag_precond         *DIAG;
         
         /** ILU preconditioner instance */
-        ilu_precond          *ILU=NULL;
+        ilu_precond          *ILU;
         
         /** ILUT preconditioner instance */
-        ilut_precond          *ILUT=NULL;
+        ilut_precond          *ILUT;
         
         /** ILDLT preconditioner instance */
-        ildlt_precond         *ILDLT=NULL;
+        ildlt_precond         *ILDLT;
         
         /** ILDLTT preconditioner instance */
-        ildltt_precond         *ILDLTT=NULL;
+        ildltt_precond         *ILDLTT;
 #ifdef LINEAR_SOLVER_USES_EIGEN
     
         /** LU factors instance for built-in Eigen SparseLU solver */
-        lu_factors            *LU=NULL;
+        lu_factors            *LU;
         
         /** Cholesky factors instance for built-in Eigen SimplicialCholesky solver */
-        cholesky_factors      *CHOL=NULL;
+        cholesky_factors      *CHOL;
         
         /** QR factors instance for built-in Eigen SparseQR solver */
-        qr_factors            *QR=NULL;
+        qr_factors            *QR;
         
 #if defined(LINEAR_SOLVER_USES_EIGEN) && defined(LINEAR_SOLVER_USES_SUPERLU)
         /** SuperLU factorization instance, requires the SuperLU library */
-        superlu_factors       *SUPERLU=NULL;
+        superlu_factors       *SUPERLU;
 #endif
         
 #if defined(LINEAR_SOLVER_USES_EIGEN) && defined(LINEAR_SOLVER_USES_CHOLMOD)
         /** Cholmod factorization instance, requires the Cholmod library */
-        cholmod_factors        *CHOLMOD=NULL;
+        cholmod_factors        *CHOLMOD;
 #endif
 #endif
     public:
