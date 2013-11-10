@@ -12,5 +12,6 @@
 #include"linear_solver_vector.h"
 #include"linear_solver_matrix.h"
 #include"linear_solver_solvers.h"
+#include"linear_solver_solvers_MPI.h"
 
 #endif
