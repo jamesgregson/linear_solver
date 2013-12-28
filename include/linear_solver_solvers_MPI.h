@@ -49,11 +49,18 @@ namespace linear_solver {
     bool solve_square_system_MPI( MPI_Comm mpi_comm, const sparse_matrix<real> &A, vector<real> &x, const vector<real> &b, solver_options opts=solver_options(), solver_cache_data<real> *cache=NULL ){
      
         int rank, size, n;
-        Epetra_MpiComm comm(mpi_comm);
-        rank = comm.MyPID();
-        size = comm.NumProc();
-        n = A.rows();
+        MPI_Comm_rank( mpi_comm, &rank );
+        MPI_Comm_size( mpi_comm, &size );
         
+        // determine the number of degrees of freedom in the problem
+        // and broadcast it to all the other processes
+        n = rank == 0 ? A.rows() : 0;
+        MPI_Bcast( &n, 1, MPI_INT, 0,mpi_comm );
+        
+        // build an Epetra communicator and initialize an Epetra_map
+        // which decides how degrees of freedom are allocated amonst
+        // the processes in the communicator
+        Epetra_MpiComm comm(mpi_comm);
         Epetra_Map map( n, 0, comm );
         Epetra_FECrsMatrix tA( Copy, map, 1 );
         Epetra_FEVector    tx( tA.OperatorDomainMap() );
@@ -139,7 +146,42 @@ namespace linear_solver {
         
         return true;
     }
+
+template< typename real >
+bool solve_square_system_MPI_simple( char *process, int nprocs, const sparse_matrix<real> &A, vector<real> &x, const vector<real> &b, solver_options opts=solver_options(), solver_cache_data<real> *cache=NULL ){
+    int rank, size;
+    MPI_Comm parent_comm, spawned_comm, merged_comm;
+    MPI_Comm_get_parent( &parent_comm );
+    if( parent_comm == MPI_COMM_NULL ){
+        // parent process, spawn a communicator
+        MPI_Comm_spawn( process, MPI_ARGV_NULL, nprocs-1, MPI_INFO_NULL, 0, MPI_COMM_SELF, &spawned_comm, MPI_ERRCODES_IGNORE );
+        MPI_Intercomm_merge( spawned_comm, false, &merged_comm );
+        MPI_Comm_size( merged_comm, &size );
+        MPI_Comm_rank( merged_comm, &rank );
+        std::cout << "Master process, rank " << rank << "/" << size << std::endl;
+    } else {
+        // child process
+        MPI_Intercomm_merge( parent_comm, true, &merged_comm );
+        MPI_Comm_size( merged_comm, &size );
+        MPI_Comm_rank( merged_comm, &rank );
+        std::cout << "Slave process, rank " << rank << "/" << size << std::endl;
+    }
     
+    solve_square_system_MPI( MPI_COMM_WORLD, A, x, b, opts );
+    
+    // close the spawned processes and free the intercommunicators
+    MPI_Comm_free( &merged_comm );
+    if( rank == 0 ){
+        MPI_Comm_free( &spawned_comm );
+    } else {
+        MPI_Comm_free( &parent_comm );
+        MPI_Finalize();
+        exit(0);
+    }
+
+    return true;
+}
+
 };
 
 #endif

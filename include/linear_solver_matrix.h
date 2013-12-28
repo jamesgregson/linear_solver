@@ -27,6 +27,7 @@ namespace linear_solver {
     public:
         /** @brief underlying GMM++ matrix type */
         typedef gmm::row_matrix< gmm::rsvector<real> > matrix_type;
+		typedef gmm::rsvector<real>					   row_type;
         
         /** @brief type of writable references returned by indexing operator */
         typedef typename matrix_type::reference reference_type;
@@ -34,6 +35,8 @@ namespace linear_solver {
         /** @brief type of non-writable references returned by indexing operator */
         typedef typename matrix_type::value_type value_type;
         
+        typedef typename gmm::rsvector<real>::iterator row_iterator;
+        typedef typename gmm::rsvector<real>::const_iterator const_row_iterator;
     private:
         /** @brief matrix instance */
         matrix_type m_M;
@@ -99,6 +102,27 @@ namespace linear_solver {
         inline void resize( int rows, int cols ){
             m_M.resize(rows,cols);
         }
+        
+		inline int row_nonzeros( const int rid ) const {
+			return m_M.row(rid).size();
+		}
+		
+        inline row_iterator row_begin( const int rid ){
+            return m_M.row(rid).begin();
+        }
+        
+        inline const_row_iterator row_begin( const int rid ) const {
+            return m_M.row(rid).begin();
+        }
+        
+        inline row_iterator row_end( const int rid ){
+            return m_M.row(rid).end();
+        }
+        
+        inline const_row_iterator row_end( const int rid ) const {
+            return m_M.row(rid).end();
+        }
+
         
         /** @brief returns a transposed copy of the matrix */
         inline sparse_matrix<real> transpose() const {
@@ -176,7 +200,7 @@ namespace linear_solver {
         /** @brief multiplies this matrix by the input matrix */
         inline sparse_matrix<real> operator*( const sparse_matrix<real> &in ) const {
             sparse_matrix<real> res( rows(), in.cols() );
-            gmm::mult( m_M, in.m_M, res.m_M );
+            gmm::mult( m_M, in.m_M, res.mat() );
             return res;
         }
     };

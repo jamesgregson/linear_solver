@@ -14,6 +14,11 @@
 #include<Eigen/Dense>
 #endif
 
+#ifdef LINEAR_SOLVER_MULTITHREADING
+#include<thread>
+#include"linear_solver_multithreading.h"
+#endif
+
 #include<gmm/gmm.h>
 
 namespace linear_solver {
@@ -95,6 +100,11 @@ namespace linear_solver {
                 tmp += m_V[i]*m_V[i];
             }
             return sqrt(tmp);
+        }
+        
+        /** @brief returns the inner product */
+        inline real dot( const vector<real> &in ) const {
+            return gmm::vect_sp( vec(), in.vec() );
         }
         
         /** @brief returns the 2-norm of the vector */

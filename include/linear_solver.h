@@ -13,5 +13,8 @@
 #include"linear_solver_matrix.h"
 #include"linear_solver_solvers.h"
 #include"linear_solver_solvers_MPI.h"
+#include"linear_solver_multithreading.h"
+#include"linear_solver_block_jacobi.h"
+#incldue"linear_solver_amg.h"
 
 #endif
