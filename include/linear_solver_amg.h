@@ -3,8 +3,10 @@
 
 #include<vector>
 
-#include<linear_solver.h>
-namespace ls=linear_solver;
+#include<linear_solver_utils.h>
+#include<linear_solver_vector.h>
+#include<linear_solver_matrix.h>
+#include<linear_solver_solvers.h>
 
 #include<timed_scope.h>
 
@@ -23,7 +25,7 @@ namespace linear_solver {
 	};
 	
 	template< typename real >
-	int amg_partition( const ls::sparse_matrix<real> &A, std::vector<int> &coarse_label ){
+	int amg_partition( const sparse_matrix<real> &A, std::vector<int> &coarse_label ){
 		
 		// loop over the vertices and find their valence
 		std::vector<int> valence( A.rows() );
@@ -42,12 +44,12 @@ namespace linear_solver {
 		// build the queue comparison object and the queue itself
 		// then insert the first vertex
 		amg_partition_queue_compare comp( valence );
-		std::set< int, partition_queue_compare > queue( comp );
+		std::set< int, amg_partition_queue_compare > queue( comp );
 		queue.insert( 0 );
 		
 		// until the vertex queue has been exhausted
 		int vid, nid, nnid, num_coarse=0;
-		typename ls::sparse_matrix<real>::const_row_iterator niter, nend, nniter, nnend;
+		typename sparse_matrix<real>::const_row_iterator niter, nend, nniter, nnend;
 		while( !queue.empty() ){
 			
 			// grab the first entry from the queue, discard it
@@ -92,7 +94,7 @@ namespace linear_solver {
 	}
 	
 	template< typename real >
-	void amg_build_restriction_and_prolongation_operators( const ls::sparse_matrix<real> &A, const int num_coarse, const std::vector<int> &coarse_label, ls::sparse_matrix<real> &P, ls::sparse_matrix<real> &R ){
+	void amg_build_restriction_and_prolongation_operators( const sparse_matrix<real> &A, const int num_coarse, const std::vector<int> &coarse_label, sparse_matrix<real> &P, sparse_matrix<real> &R ){
 		
 		// get the number of fine variables
 		int num_fine_vars = A.rows();
@@ -108,7 +110,7 @@ namespace linear_solver {
 		// adjacent coarse neighbors
 		int num_coarse_nbrs, nid;
 		std::vector<int> nbr(1024);
-		typename ls::sparse_matrix<real>::const_row_iterator niter, nend;
+		typename sparse_matrix<real>::const_row_iterator niter, nend;
 		for( int i=0; i<num_fine_vars; i++ ){
 			
 			if( coarse_label[i] >= 0 ){
@@ -146,7 +148,7 @@ namespace linear_solver {
 	}
 	
 	template< typename real >
-	void amg_build( const ls::sparse_matrix<real> &A, ls::sparse_matrix<real> &Ac, ls::sparse_matrix<real> &P, ls::sparse_matrix<real> &R ){
+	void amg_build( const sparse_matrix<real> &A, sparse_matrix<real> &Ac, sparse_matrix<real> &P, sparse_matrix<real> &R ){
 		int num_coarse;
 		std::vector<int> coarse_label;
 		num_coarse = amg_partition( A, coarse_label );
@@ -155,24 +157,24 @@ namespace linear_solver {
 	}
 	
 	template< typename real >
-	void amg_solve_two_level( const ls::sparse_matrix<real> &A,
-							 ls::vector<real> &x,
-							 const ls::vector<real> &b,
-							 ls::sparse_matrix<real> &Ac,
-							 ls::sparse_matrix<real> &P,
-							 ls::sparse_matrix<real> &R,
-							 ls::solver_options opt_fine,
-							 ls::solver_options opt_coarse,
-							 ls::solver_cache_data<real> *cache_fine=NULL,
-							 ls::solver_cache_data<real> *cache_coarse=NULL ){
+	void amg_solve_two_level( const sparse_matrix<real> &A,
+							 vector<real> &x,
+							 const vector<real> &b,
+							 sparse_matrix<real> &Ac,
+							 sparse_matrix<real> &P,
+							 sparse_matrix<real> &R,
+							 solver_options opt_fine,
+							 solver_options opt_coarse,
+							 solver_cache_data<real> *cache_fine=NULL,
+							 solver_cache_data<real> *cache_coarse=NULL ){
 		
 		bool verbose=false, own_fine_cache=false, own_coarse_cache=false;
 		real norm, conv_tol;
 		int iters;
 		
 		// set options
-		iters    = ls::from_str<int>( opt_fine["AMG_MAX_ITERS"] );
-		conv_tol = ls::from_str<real>( opt_fine["AMG_CONV_TOL"] );
+		iters    = from_str<int>( opt_fine["AMG_MAX_ITERS"] );
+		conv_tol = from_str<real>( opt_fine["AMG_CONV_TOL"] );
 		verbose  = (opt_fine["AMG_VERBOSE"] == "TRUE" ) ? true : false;
 		
 		if( verbose )
@@ -193,11 +195,11 @@ namespace linear_solver {
 		// not, allocate one that will be deleted at
 		// the end of the solve
 		if( !cache_fine ){
-			cache_fine = new ls::solver_cache_data<real>();
+			cache_fine = new solver_cache_data<real>();
 			own_fine_cache=true;
 		}
 		if( !cache_coarse ){
-			cache_coarse = new ls::solver_cache_data<real>();
+			cache_coarse = new solver_cache_data<real>();
 			own_coarse_cache=true;
 		}
 		
@@ -205,11 +207,11 @@ namespace linear_solver {
 		// grid to prevent aliasing of the residual
 		utilities::timed_scope solve_timer;
 		
-		ls::solve_square_system( A, x, b, opt_fine, cache_fine );
+		solve_square_system( A, x, b, opt_fine, cache_fine );
 		
 		// now try to solve the system
 		for( int k=0; k<iters; k++ ){
-			ls::vector<real> r, xc( Ac.rows(), 0.0 );
+			vector<real> r, xc( Ac.rows(), 0.0 );
 			
 			// compute residual and evaluate convergence criteria
 			r = b-A*x;
@@ -220,11 +222,11 @@ namespace linear_solver {
 				break;
 			
 			// solve for the restricted residual on the coarse mesh
-			ls::solve_square_system( Ac, xc, R*r, opt_coarse, cache_coarse );
+			solve_square_system( Ac, xc, R*r, opt_coarse, cache_coarse );
 			
 			// prolong correction and solve on the fine mesh
 			x += P*xc;
-			ls::solve_square_system( A, x, b, opt_fine, cache_fine );
+			solve_square_system( A, x, b, opt_fine, cache_fine );
 		}
 		if( verbose ){
 			std::cout << "  finished with residual: " << norm << " in " << solve_timer << " seconds." << std::endl;
