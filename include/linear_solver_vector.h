@@ -76,6 +76,11 @@ namespace linear_solver {
             m_V.clear();
         }
         
+		/** @brief appends an entry to the vector */
+		inline void push_back( real v ){
+			m_V.push_back( v );
+		}
+		
         /** @brief resizes the vector */
         inline void resize( size_t size ){
             m_V.resize( size );
@@ -119,11 +124,13 @@ namespace linear_solver {
         
         /** @brief return a writable reference to an entry of the vector */
         inline real &operator[]( size_t id ){
+			if( id >= size() ) throw "index error";
             return m_V[id];
         }
         
         /** @brief return a const reference to an entry of the vector */
         inline const real &operator[]( size_t id ) const {
+			if( id >= size() ) throw "index error";
             return m_V[id];
         }
         

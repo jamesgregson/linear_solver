@@ -8,7 +8,7 @@
 #include<linear_solver_matrix.h>
 #include<linear_solver_solvers.h>
 
-#include<timed_scope.h>
+//#include<timed_scope.h>
 
 namespace linear_solver {
 	
@@ -183,10 +183,11 @@ namespace linear_solver {
 		// coarse system and restriction/prolongation operators do
 		// not exist, construct them
 		if( Ac.rows() == 0 && P.rows() == 0 && R.rows() == 0 ){
-			utilities::timed_scope build_timer;
+			//utilities::timed_scope build_timer;
 			amg_build( A, Ac, P, R );
-			if( verbose )
-				std::cout << "  constructed coarsened system and transfer operators in " << build_timer << " seconds." << std::endl;
+			if( verbose ){
+				//std::cout << "  constructed coarsened system and transfer operators in " << build_timer << " seconds." << std::endl;
+			}
 		}
 		
 		// have to solve these systems repeatedly so,
@@ -205,7 +206,7 @@ namespace linear_solver {
 		
 		// start off by solving a few iterations on the coarse
 		// grid to prevent aliasing of the residual
-		utilities::timed_scope solve_timer;
+		//utilities::timed_scope solve_timer;
 		
 		solve_square_system( A, x, b, opt_fine, cache_fine );
 		
@@ -217,7 +218,9 @@ namespace linear_solver {
 			r = b-A*x;
 			norm = r.norm();
 			
-			if( verbose ) std::cout << "  amg iteration [" << k+1 << "/" << iters << "], fine residual: " << norm << std::endl;
+			if( verbose ){
+				// std::cout << "  amg iteration [" << k+1 << "/" << iters << "], fine residual: " << norm << std::endl;
+			}
 			if( norm < conv_tol )
 				break;
 			
@@ -229,7 +232,7 @@ namespace linear_solver {
 			solve_square_system( A, x, b, opt_fine, cache_fine );
 		}
 		if( verbose ){
-			std::cout << "  finished with residual: " << norm << " in " << solve_timer << " seconds." << std::endl;
+			//std::cout << "  finished with residual: " << norm << " in " << solve_timer << " seconds." << std::endl;
 		}
 		if( own_fine_cache )   delete cache_fine;
 		if( own_coarse_cache ) delete cache_coarse;

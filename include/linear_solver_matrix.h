@@ -75,7 +75,7 @@ namespace linear_solver {
         
         /** @brief empties the matrix */
         void clear(){
-            m_M.clear();
+            m_M = matrix_type();
         }
         
         /** @brief returns the number of matrix rows */
